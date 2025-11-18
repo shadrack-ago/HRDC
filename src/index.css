@@ -45,6 +45,16 @@
   .chat-bubble-ai {
     @apply bg-secondary-100 text-secondary-800 rounded-2xl rounded-bl-md px-4 py-2 max-w-xs mr-auto;
   }
+
+  /* Chat message links */
+  .chat-link {
+    @apply inline-flex items-center gap-1 underline hover:no-underline transition-all duration-200;
+    word-break: break-all;
+  }
+  
+  .chat-link:hover {
+    @apply shadow-sm;
+  }
 }
 
 /* Custom scrollbar */

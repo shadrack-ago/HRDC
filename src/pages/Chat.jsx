@@ -10,7 +10,8 @@ import {
   Bot,
   User,
   Clock,
-  AlertCircle
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react'
 import { format } from 'date-fns'
 import jsPDF from 'jspdf'
@@ -32,6 +33,43 @@ const Chat = () => {
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
 
+  // Function to detect URLs and render them as clickable links
+  const renderMessageWithLinks = (text, isUserMessage = false) => {
+    // URL regex pattern that matches http, https, and www URLs
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi
+    
+    if (!urlRegex.test(text)) {
+      return text
+    }
+
+    const parts = text.split(urlRegex)
+    
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        // Ensure URL has protocol
+        const url = part.startsWith('www.') ? `https://${part}` : part
+        
+        return (
+          <a
+            key={index}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`chat-link ${
+              isUserMessage 
+                ? 'text-primary-100 hover:text-white' 
+                : 'text-primary-600 hover:text-primary-800'
+            }`}
+          >
+            {part}
+            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+          </a>
+        )
+      }
+      return part
+    })
+  }
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -39,6 +77,14 @@ const Chat = () => {
   useEffect(() => {
     scrollToBottom()
   }, [currentConversation?.messages])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
+    }
+  }, [message])
 
   const handleSendMessage = async (e) => {
     e.preventDefault()
@@ -242,13 +288,13 @@ const Chat = () => {
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
           {currentConversation && currentConversation.messages.length > 0 ? (
-            <div className="space-y-4 max-w-4xl mx-auto">
+            <div className="space-y-4 max-w-6xl mx-auto">
               {currentConversation.messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`flex items-start space-x-3 max-w-xs sm:max-w-md lg:max-w-lg ${msg.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                  <div className={`flex items-start space-x-3 max-w-sm sm:max-w-lg lg:max-w-2xl xl:max-w-4xl ${msg.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                     <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${msg.sender === 'user' ? 'bg-primary-600' : 'bg-secondary-200'}`}>
                       {msg.sender === 'user' ? (
                         <User className="h-4 w-4 text-white" />
@@ -257,7 +303,9 @@ const Chat = () => {
                       )}
                     </div>
                     <div className={`rounded-2xl px-4 py-2 ${msg.sender === 'user' ? 'bg-primary-600 text-white rounded-br-md' : 'bg-white border border-secondary-200 rounded-bl-md'}`}>
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      <p className="text-sm whitespace-pre-wrap">
+                        {renderMessageWithLinks(msg.content, msg.sender === 'user')}
+                      </p>
                       <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-primary-100' : 'text-secondary-500'}`}>
                         {format(new Date(msg.timestamp), 'HH:mm')}
                       </p>
@@ -274,7 +322,7 @@ const Chat = () => {
               
               {loading && (
                 <div className="flex justify-start">
-                  <div className="flex items-start space-x-3 max-w-xs sm:max-w-md lg:max-w-lg">
+                  <div className="flex items-start space-x-3 max-w-sm sm:max-w-lg lg:max-w-2xl xl:max-w-4xl">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary-200 flex items-center justify-center">
                       <Bot className="h-4 w-4 text-secondary-600" />
                     </div>
@@ -335,7 +383,7 @@ const Chat = () => {
 
         {/* Message Input */}
         <div className="bg-white border-t border-secondary-200 p-4">
-          <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto">
+          <form onSubmit={handleSendMessage} className="max-w-6xl mx-auto">
             <div className="flex items-end space-x-3">
               <div className="flex-1">
                 <textarea
@@ -344,9 +392,9 @@ const Chat = () => {
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Ask about GDPR, employment law, data security, AI systems..."
-                  className="w-full px-4 py-3 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none overflow-hidden"
                   rows="1"
-                  style={{ minHeight: '44px', maxHeight: '120px' }}
+                  style={{ minHeight: '44px', maxHeight: '120px', height: 'auto' }}
                   disabled={loading}
                 />
               </div>
@@ -359,6 +407,21 @@ const Chat = () => {
               </button>
             </div>
           </form>
+          
+          {/* CustomCX Footer */}
+          <div className="text-center mt-3 pb-2">
+            <p className="text-xs text-secondary-500">
+              Powered by{' '}
+              <a 
+                href="https://customcx.com/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary-600 hover:text-primary-800 underline transition-colors"
+              >
+                CustomCX
+              </a>
+            </p>
+          </div>
         </div>
       </div>
 
