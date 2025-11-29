@@ -9,6 +9,7 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Chat from './pages/Chat'
 import Profile from './pages/Profile'
+import Admin from './pages/Admin'
 import ProtectedRoute from './components/ProtectedRoute'
 import './utils/initDemoData'
 
@@ -36,6 +37,11 @@ function App() {
                 <Route path="profile" element={
                   <ProtectedRoute>
                     <Profile />
+                  </ProtectedRoute>
+                } />
+                <Route path="admin" element={
+                  <ProtectedRoute>
+                    <Admin />
                   </ProtectedRoute>
                 } />
               </Route>

@@ -9,7 +9,8 @@ import {
   MessageSquare, 
   Home, 
   LogOut,
-  Settings
+  Settings,
+  UserCog
 } from 'lucide-react'
 
 const Header = () => {
@@ -78,6 +79,19 @@ const Header = () => {
                   <Settings className="h-4 w-4" />
                   <span>Profile</span>
                 </Link>
+                {user?.isAdmin && (
+                  <Link
+                    to="/admin"
+                    className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors ${
+                      isActive('/admin')
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-secondary-600 hover:text-secondary-900'
+                    }`}
+                  >
+                    <UserCog className="h-4 w-4" />
+                    <span>Admin</span>
+                  </Link>
+                )}
                 <div className="flex items-center space-x-3">
                   <div className="text-sm">
                     <p className="text-secondary-900 font-medium">

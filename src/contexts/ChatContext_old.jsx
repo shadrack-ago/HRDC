@@ -107,56 +107,6 @@ export const ChatProvider = ({ children }) => {
     }
   }
 
-  const saveMessageToSupabase = async (conversationId, content, sender, isError = false) => {
-    try {
-      const { data: message, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          content,
-          sender,
-          is_error: isError,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single()
-
-      if (error) {
-        throw error
-      }
-
-      return {
-        id: message.id,
-        content: message.content,
-        sender: message.sender,
-        timestamp: message.created_at,
-        isError: message.is_error || false
-      }
-    } catch (error) {
-      console.error('Error saving message:', error)
-      throw error
-    }
-  }
-
-  const updateConversationInSupabase = async (conversationId, updates) => {
-    try {
-      const { error } = await supabase
-        .from('conversations')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', conversationId)
-
-      if (error) {
-        throw error
-      }
-    } catch (error) {
-      console.error('Error updating conversation:', error)
-      throw error
-    }
-  }
-
   const sendMessage = async (message, conversationId = null) => {
     if (!user) throw new Error('User not authenticated')
     
@@ -164,49 +114,42 @@ export const ChatProvider = ({ children }) => {
     
     // If no conversation exists, create one
     if (!targetConversation && !conversationId) {
-      targetConversation = await createNewConversation()
+      targetConversation = createNewConversation()
     } else if (conversationId) {
       targetConversation = conversations.find(c => c.id === conversationId)
     }
     
     if (!targetConversation) throw new Error('No conversation found')
     
+    // Add user message
+    const userMessage = {
+      id: Date.now().toString(),
+      content: message,
+      sender: 'user',
+      timestamp: new Date().toISOString()
+    }
+    
+    const updatedMessages = [...targetConversation.messages, userMessage]
+    
+    // Update conversation with user message
+    const updatedConversation = {
+      ...targetConversation,
+      messages: updatedMessages,
+      updatedAt: new Date().toISOString(),
+      title: targetConversation.messages.length === 0 ? message.substring(0, 50) + '...' : targetConversation.title
+    }
+    
+    const updatedConversations = conversations.map(c => 
+      c.id === updatedConversation.id ? updatedConversation : c
+    )
+    
+    setConversations(updatedConversations)
+    setCurrentConversation(updatedConversation)
+    saveConversations(updatedConversations)
+    
+    // Send to n8n webhook and wait for response
+    setLoading(true)
     try {
-      // Save user message to Supabase
-      const userMessage = await saveMessageToSupabase(
-        targetConversation.id,
-        message,
-        'user'
-      )
-
-      // Update conversation title if it's the first message
-      const newTitle = targetConversation.messages.length === 0 
-        ? message.substring(0, 50) + (message.length > 50 ? '...' : '')
-        : targetConversation.title
-
-      if (newTitle !== targetConversation.title) {
-        await updateConversationInSupabase(targetConversation.id, { title: newTitle })
-      }
-
-      // Update local state with user message
-      const updatedMessages = [...targetConversation.messages, userMessage]
-      const updatedConversation = {
-        ...targetConversation,
-        messages: updatedMessages,
-        title: newTitle,
-        updatedAt: new Date().toISOString()
-      }
-
-      const updatedConversations = conversations.map(c => 
-        c.id === updatedConversation.id ? updatedConversation : c
-      )
-
-      setConversations(updatedConversations)
-      setCurrentConversation(updatedConversation)
-
-      // Send to n8n webhook and wait for response
-      setLoading(true)
-      
       console.log('Sending message to n8n:', message)
       
       const response = await fetch('https://agents.customcx.com/webhook/HDRC', {
@@ -228,6 +171,7 @@ export const ChatProvider = ({ children }) => {
       })
       
       console.log('Response status:', response.status)
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -273,12 +217,12 @@ export const ChatProvider = ({ children }) => {
       }
       
       if (aiMessageContent) {
-        // Save AI message to Supabase
-        const aiMessage = await saveMessageToSupabase(
-          targetConversation.id,
-          aiMessageContent,
-          'ai'
-        )
+        const aiMessage = {
+          id: (Date.now() + 1).toString(),
+          content: aiMessageContent,
+          sender: 'ai',
+          timestamp: new Date().toISOString()
+        }
         
         const finalMessages = [...updatedMessages, aiMessage]
         const finalConversation = {
@@ -293,6 +237,7 @@ export const ChatProvider = ({ children }) => {
         
         setConversations(finalConversations)
         setCurrentConversation(finalConversation)
+        saveConversations(finalConversations)
         
         return aiMessage
       }
@@ -304,31 +249,29 @@ export const ChatProvider = ({ children }) => {
     } catch (error) {
       console.error('Error sending message:', error)
       
-      try {
-        // Add error message to Supabase
-        const errorMessage = await saveMessageToSupabase(
-          targetConversation.id,
-          'I apologize, but I encountered an issue processing your request. Please try again.',
-          'ai',
-          true
-        )
-        
-        const errorMessages = [...(currentConversation?.messages || []), errorMessage]
-        const errorConversation = {
-          ...currentConversation,
-          messages: errorMessages,
-          updatedAt: new Date().toISOString()
-        }
-        
-        const errorConversations = conversations.map(c => 
-          c.id === errorConversation.id ? errorConversation : c
-        )
-        
-        setConversations(errorConversations)
-        setCurrentConversation(errorConversation)
-      } catch (saveError) {
-        console.error('Error saving error message:', saveError)
+      // Add error message
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        content: 'I apologize, but I encountered an issue processing your request. Please try again.',
+        sender: 'ai',
+        timestamp: new Date().toISOString(),
+        isError: true
       }
+      
+      const errorMessages = [...updatedMessages, errorMessage]
+      const errorConversation = {
+        ...updatedConversation,
+        messages: errorMessages,
+        updatedAt: new Date().toISOString()
+      }
+      
+      const errorConversations = conversations.map(c => 
+        c.id === errorConversation.id ? errorConversation : c
+      )
+      
+      setConversations(errorConversations)
+      setCurrentConversation(errorConversation)
+      saveConversations(errorConversations)
       
       throw error
     } finally {
@@ -336,28 +279,109 @@ export const ChatProvider = ({ children }) => {
     }
   }
 
-  const deleteConversation = async (conversationId) => {
-    try {
-      // Delete from Supabase (messages will be deleted via cascade)
-      const { error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('id', conversationId)
-
-      if (error) {
-        throw error
+  const pollForResponse = async (requestId, conversation, messages, maxAttempts = 30) => {
+    let attempts = 0
+    const pollInterval = 2000 // 2 seconds
+    
+    const poll = async () => {
+      try {
+        attempts++
+        
+        // Poll the n8n webhook for response
+        const response = await fetch(`https://agents.customcx.com/webhook/HDRC/status/${requestId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          
+          if (data.status === 'completed' && data.message) {
+            // Response received, add AI message
+            const aiMessage = {
+              id: (Date.now() + 1).toString(),
+              content: data.message,
+              sender: 'ai',
+              timestamp: new Date().toISOString()
+            }
+            
+            const finalMessages = [...messages, aiMessage]
+            const finalConversation = {
+              ...conversation,
+              messages: finalMessages,
+              updatedAt: new Date().toISOString()
+            }
+            
+            // Update conversations state
+            setConversations(prevConversations => {
+              const updatedConversations = prevConversations.map(c => 
+                c.id === finalConversation.id ? finalConversation : c
+              )
+              saveConversations(updatedConversations)
+              return updatedConversations
+            })
+            setCurrentConversation(finalConversation)
+            setLoading(false)
+            return
+          }
+          
+          if (data.status === 'failed') {
+            throw new Error(data.error || 'AI processing failed')
+          }
+        }
+        
+        // Continue polling if not completed and haven't exceeded max attempts
+        if (attempts < maxAttempts) {
+          setTimeout(poll, pollInterval)
+        } else {
+          throw new Error('Response timeout - please try again')
+        }
+        
+      } catch (error) {
+        console.error('Polling error:', error)
+        
+        // Add timeout/error message
+        const errorMessage = {
+          id: (Date.now() + 1).toString(),
+          content: 'I apologize, but the response is taking longer than expected. Please try again.',
+          sender: 'ai',
+          timestamp: new Date().toISOString(),
+          isError: true
+        }
+        
+        const errorMessages = [...messages, errorMessage]
+        const errorConversation = {
+          ...conversation,
+          messages: errorMessages,
+          updatedAt: new Date().toISOString()
+        }
+        
+        // Update conversations state
+        setConversations(prevConversations => {
+          const updatedConversations = prevConversations.map(c => 
+            c.id === errorConversation.id ? errorConversation : c
+          )
+          saveConversations(updatedConversations)
+          return updatedConversations
+        })
+        setCurrentConversation(errorConversation)
+        setLoading(false)
       }
+    }
+    
+    // Start polling after a short delay
+    setTimeout(poll, pollInterval)
+  }
 
-      // Update local state
-      const updatedConversations = conversations.filter(c => c.id !== conversationId)
-      setConversations(updatedConversations)
-      
-      if (currentConversation?.id === conversationId) {
-        setCurrentConversation(null)
-      }
-    } catch (error) {
-      console.error('Error deleting conversation:', error)
-      throw error
+  const deleteConversation = (conversationId) => {
+    const updatedConversations = conversations.filter(c => c.id !== conversationId)
+    setConversations(updatedConversations)
+    saveConversations(updatedConversations)
+    
+    if (currentConversation?.id === conversationId) {
+      setCurrentConversation(null)
     }
   }
 
@@ -366,26 +390,11 @@ export const ChatProvider = ({ children }) => {
     setCurrentConversation(conversation || null)
   }
 
-  const clearAllConversations = async () => {
-    if (!user) return
-
-    try {
-      // Delete all conversations for the user from Supabase
-      const { error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('user_id', user.id)
-
-      if (error) {
-        throw error
-      }
-
-      // Update local state
-      setConversations([])
-      setCurrentConversation(null)
-    } catch (error) {
-      console.error('Error clearing conversations:', error)
-      throw error
+  const clearAllConversations = () => {
+    setConversations([])
+    setCurrentConversation(null)
+    if (user) {
+      localStorage.removeItem(`hrdc_chats_${user.id}`)
     }
   }
 
