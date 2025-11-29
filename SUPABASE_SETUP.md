@@ -5,14 +5,14 @@ This guide will help you set up Supabase authentication and database for the HR 
 
 ## Prerequisites
 - Supabase account
-- Project URL: `https://epspagpwvpqrypxpphpd.supabase.co`
-- Anon public key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwc3BhZ3B3dnBxcnlweHBwaHBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzA1MTQsImV4cCI6MjA3OTkwNjUxNH0.R6YT4xac97XF9WM-Bo_VOt-JXaKomNpOScapfDCfazE`
+- Project URL: `[Your Supabase Project URL]`
+- Anon public key: `[Your Supabase Anon Key]`
 
 ## Step 1: Environment Variables
 Create a `.env` file in the project root with:
 ```
-VITE_SUPABASE_URL=https://epspagpwvpqrypxpphpd.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwc3BhZ3B3dnBxcnlweHBwaHBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzMzA1MTQsImV4cCI6MjA3OTkwNjUxNH0.R6YT4xac97XF9WM-Bo_VOt-JXaKomNpOScapfDCfazE
+VITE_SUPABASE_URL=[Your Supabase Project URL]
+VITE_SUPABASE_ANON_KEY=[Your Supabase Anon Key]
 ```
 
 ## Step 2: Database Schema Setup
