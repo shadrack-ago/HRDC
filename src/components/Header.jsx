@@ -183,6 +183,20 @@ const Header = () => {
                     <Settings className="h-4 w-4" />
                     <span>Profile</span>
                   </Link>
+                  {user?.isAdmin && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setIsMenuOpen(false)}
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                        isActive('/admin')
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-secondary-600 hover:text-secondary-900'
+                      }`}
+                    >
+                      <UserCog className="h-4 w-4" />
+                      <span>Admin</span>
+                    </Link>
+                  )}
                   <button
                     onClick={handleLogout}
                     className="flex items-center space-x-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
