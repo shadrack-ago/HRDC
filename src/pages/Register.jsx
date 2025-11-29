@@ -71,7 +71,10 @@ const Register = () => {
 
     try {
       await register(formData)
-      navigate('/dashboard')
+      // Show success message about email verification
+      setError('')
+      alert('Registration successful! Please check your email to confirm your account before signing in.')
+      navigate('/login')
     } catch (err) {
       setError(err.message)
     } finally {
