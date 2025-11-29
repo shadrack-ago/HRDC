@@ -163,9 +163,11 @@ SELECT
 -- Grant access to the view for admins
 GRANT SELECT ON admin_stats TO authenticated;
 
--- 10. Enable email confirmation (run this in Supabase Dashboard > Authentication > Settings)
+-- 10. Enable email confirmation and password reset (run this in Supabase Dashboard > Authentication > Settings)
 -- Set "Enable email confirmations" to ON
 -- Set "Confirm email" to ON
+-- Set "Enable password reset" to ON
+-- Set password reset redirect URL to: https://your-domain.com/reset-password
 
 -- IMPORTANT NOTES:
 -- 1. Make sure to enable email confirmation in Supabase Dashboard

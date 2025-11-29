@@ -26,12 +26,15 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 2. Enable the following:
    - **Enable email confirmations**: ON
    - **Confirm email**: ON
+   - **Enable password reset**: ON
    - **Enable phone confirmations**: OFF (unless needed)
 
 3. Configure Email Templates (optional but recommended):
    - Go to Authentication > Email Templates
    - Customize the confirmation email template
-   - Set redirect URL to: `https://your-domain.com/dashboard`
+   - Customize the password reset email template
+   - Set confirmation redirect URL to: `https://your-domain.com/dashboard`
+   - Set password reset redirect URL to: `https://your-domain.com/reset-password`
 
 ## Step 4: Row Level Security (RLS)
 The schema automatically sets up RLS policies that ensure:
