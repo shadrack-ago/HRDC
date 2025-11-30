@@ -33,7 +33,10 @@ const Login = () => {
 
     try {
       await login(formData.email, formData.password)
-      navigate(from, { replace: true })
+      
+      // Note: Smart routing will be handled by useEffect after user state updates
+      // For now, navigate to dashboard and let the app redirect if needed
+      navigate(from === '/' ? '/dashboard' : from, { replace: true })
     } catch (err) {
       setError(err.message)
     } finally {

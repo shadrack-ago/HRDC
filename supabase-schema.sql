@@ -29,14 +29,10 @@ CREATE POLICY "Users can update own profile" ON profiles
 CREATE POLICY "Users can insert own profile" ON profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Admin can view all profiles
-CREATE POLICY "Admins can view all profiles" ON profiles
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() AND is_admin = TRUE
-    )
-  );
+-- Note: Admin policy removed to prevent infinite recursion
+-- Admin access should be handled at the application level or via service role
+-- To manually make a user admin, run:
+-- UPDATE profiles SET is_admin = TRUE WHERE id = 'user-uuid';
 
 -- 2. Conversations table
 CREATE TABLE IF NOT EXISTS conversations (
@@ -63,14 +59,8 @@ CREATE POLICY "Users can update own conversations" ON conversations
 CREATE POLICY "Users can delete own conversations" ON conversations
   FOR DELETE USING (auth.uid() = user_id);
 
--- Admin can view all conversations
-CREATE POLICY "Admins can view all conversations" ON conversations
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() AND is_admin = TRUE
-    )
-  );
+-- Note: Admin policy removed to prevent infinite recursion
+-- Admin access should be handled at the application level
 
 -- 3. Messages table
 CREATE TABLE IF NOT EXISTS messages (
@@ -102,14 +92,8 @@ CREATE POLICY "Users can insert own messages" ON messages
     )
   );
 
--- Admin can view all messages
-CREATE POLICY "Admins can view all messages" ON messages
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() AND is_admin = TRUE
-    )
-  );
+-- Note: Admin policy removed to prevent infinite recursion
+-- Admin access should be handled at the application level
 
 -- 4. Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_profiles_is_admin ON profiles(is_admin);

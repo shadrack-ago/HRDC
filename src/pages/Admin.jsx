@@ -24,68 +24,51 @@ const Admin = () => {
     try {
       setLoading(true)
 
-      // Get total users count
-      const { count: totalUsers, error: usersError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
+      // Get admin statistics using the new admin_stats view
+      const { data: statsData, error: statsError } = await supabase
+        .from('admin_stats')
+        .select('*')
+        .single()
+
+      if (statsError) {
+        console.error('Error fetching admin stats:', statsError)
+        // Fallback to basic stats if admin view fails
+        setStats({
+          totalUsers: 0,
+          totalConversations: 0,
+          totalMessages: 0,
+          usersThisMonth: 0
+        })
+      } else {
+        setStats({
+          totalUsers: statsData.total_users || 0,
+          totalConversations: statsData.total_conversations || 0,
+          totalMessages: statsData.total_messages || 0,
+          usersThisMonth: statsData.users_this_month || 0
+        })
+      }
+
+      // Get recent users using the admin function
+      const { data: recentUsers, error: usersError } = await supabase
+        .rpc('get_recent_users', { limit_count: 10 })
 
       if (usersError) {
-        console.error('Error fetching users count:', usersError)
+        console.error('Error fetching recent users:', usersError)
+        setUsers([])
+      } else {
+        setUsers(recentUsers || [])
       }
 
-      // Get total conversations count
-      const { count: totalConversations, error: conversationsError } = await supabase
-        .from('conversations')
-        .select('*', { count: 'exact', head: true })
-
-      if (conversationsError) {
-        console.error('Error fetching conversations count:', conversationsError)
-      }
-
-      // Get total messages count
-      const { count: totalMessages, error: messagesError } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-
-      if (messagesError) {
-        console.error('Error fetching messages count:', messagesError)
-      }
-
-      // Get users from this month
-      const thisMonth = new Date()
-      thisMonth.setDate(1)
-      thisMonth.setHours(0, 0, 0, 0)
-
-      const { count: usersThisMonth, error: monthlyUsersError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', thisMonth.toISOString())
-
-      if (monthlyUsersError) {
-        console.error('Error fetching monthly users:', monthlyUsersError)
-      }
-
-      // Get recent users with details
-      const { data: recentUsers, error: recentUsersError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (recentUsersError) {
-        console.error('Error fetching recent users:', recentUsersError)
-      }
-
-      setStats({
-        totalUsers: totalUsers || 0,
-        totalConversations: totalConversations || 0,
-        totalMessages: totalMessages || 0,
-        usersThisMonth: usersThisMonth || 0
-      })
-
-      setUsers(recentUsers || [])
     } catch (error) {
       console.error('Error loading admin data:', error)
+      // Set fallback data
+      setStats({
+        totalUsers: 0,
+        totalConversations: 0,
+        totalMessages: 0,
+        usersThisMonth: 0
+      })
+      setUsers([])
     } finally {
       setLoading(false)
     }

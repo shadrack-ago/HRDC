@@ -13,6 +13,7 @@ import Admin from './pages/Admin'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ProtectedRoute from './components/ProtectedRoute'
+import SmartRouter from './components/SmartRouter'
 import './utils/initDemoData'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
     <AuthProvider>
       <ChatProvider>
         <Router>
+          <SmartRouter />
           <div className="min-h-screen bg-secondary-50">
             <Routes>
               <Route path="/" element={<Layout />}>
