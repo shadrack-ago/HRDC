@@ -48,9 +48,12 @@ const Admin = () => {
         })
       }
 
-      // Get recent users using the admin function
+      // Get recent users directly (simplified for now)
       const { data: recentUsers, error: usersError } = await supabase
-        .rpc('get_recent_users', { limit_count: 10 })
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10)
 
       if (usersError) {
         console.error('Error fetching recent users:', usersError)

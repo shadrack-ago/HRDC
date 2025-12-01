@@ -14,7 +14,6 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ProtectedRoute from './components/ProtectedRoute'
 import SmartRouter from './components/SmartRouter'
-import './utils/initDemoData'
 
 function App() {
   return (

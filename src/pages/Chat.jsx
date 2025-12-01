@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useChat } from '../contexts/ChatContext'
+import UsageLimitBanner from '../components/UsageLimitBanner'
+import SubscriptionModal from '../components/SubscriptionModal'
+import { checkUsageLimit, incrementUsageCount } from '../lib/paystack'
 import { 
   Send, 
   Plus, 
@@ -30,6 +33,8 @@ const Chat = () => {
   
   const [message, setMessage] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [usageData, setUsageData] = useState(null)
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -90,11 +95,42 @@ const Chat = () => {
     e.preventDefault()
     if (!message.trim() || loading) return
 
+    // Check usage limit before sending message (temporarily disabled)
+    try {
+      const usage = await checkUsageLimit(user.id)
+      setUsageData(usage)
+      
+      if (!usage.can_query) {
+        setShowUpgradeModal(true)
+        return
+      }
+    } catch (error) {
+      console.error('Error checking usage limit:', error)
+      // Continue anyway if payment tables don't exist yet
+    }
+
     const messageToSend = message.trim()
     setMessage('')
     
     try {
+      // Increment usage count before sending (temporarily disabled)
+      try {
+        await incrementUsageCount(user.id)
+      } catch (error) {
+        console.error('Error incrementing usage:', error)
+        // Continue anyway if payment tables don't exist yet
+      }
+      
       await sendMessage(messageToSend)
+      
+      // Refresh usage data after successful message
+      try {
+        const updatedUsage = await checkUsageLimit(user.id)
+        setUsageData(updatedUsage)
+      } catch (error) {
+        console.error('Error updating usage:', error)
+        // Continue anyway
+      }
     } catch (error) {
       console.error('Failed to send message:', error)
     }
@@ -264,6 +300,9 @@ const Chat = () => {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col lg:ml-0">
+        {/* Usage Limit Banner */}
+        <UsageLimitBanner onUsageUpdate={(data) => setUsageData(data)} />
+
         {/* Chat Header */}
         <div className="bg-white border-b border-secondary-200 p-4">
           <div className="flex items-center justify-between">
@@ -442,6 +481,16 @@ const Chat = () => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onSubscriptionUpdate={() => {
+          // Refresh usage data after subscription update
+          checkUsageLimit(user.id).then(setUsageData)
+        }}
+      />
     </div>
   )
 }
