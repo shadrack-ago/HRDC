@@ -27,7 +27,6 @@ export const AuthProvider = ({ children }) => {
 
   const clearSupabaseAuthTokens = () => {
     try {
-      console.log('[Auth] Clearing Supabase auth tokens')
       const keysToRemove = []
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
@@ -43,31 +42,24 @@ export const AuthProvider = ({ children }) => {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        console.log('[Auth] Bootstrap start')
         const { data: { session } } = await supabase.auth.getSession()
         // Cross-check with getUser to detect corrupted/stale tokens on old devices
         const { data: userResp, error: userErr } = await supabase.auth.getUser()
 
-        console.log('[Auth] getSession user:', session?.user?.id, 'getUser user:', userResp?.user?.id, 'error:', userErr?.message)
-
         if (session?.user && userResp?.user && session.user.id === userResp.user.id) {
-          console.log('[Auth] Bootstrap valid session found for', session.user.id)
           await fetchUserProfile(session.user)
         } else {
           // If session exists but getUser fails or mismatch, clear tokens and reset
           if (session?.user && (userErr || !userResp?.user)) {
-            console.warn('[Auth] Stale/mismatched session detected, clearing tokens')
             clearSupabaseAuthTokens()
           }
           setUser(null)
         }
       } catch (_) {
         // On any bootstrap error, clear tokens to self-heal
-        console.error('[Auth] Bootstrap error, clearing tokens')
         clearSupabaseAuthTokens()
         setUser(null)
       } finally {
-        console.log('[Auth] Bootstrap end')
         setLoading(false)
       }
     }
@@ -76,20 +68,17 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[Auth] onAuthStateChange event:', event, 'user:', session?.user?.id)
       if (session?.user) {
         await fetchUserProfile(session.user)
       } else {
         setUser(null)
         if (event === 'SIGNED_OUT') {
-          console.log('[Auth] Signed out')
           clearSupabaseAuthTokens()
         }
       }
 
       // Also treat token refresh/user updated as valid sign-in states
       if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
-        console.log('[Auth] Event requires profile refresh:', event)
         await fetchUserProfile(session.user)
       }
 
@@ -101,7 +90,6 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async (authUser) => {
     try {
-      console.log('[Auth] Fetching profile for', authUser?.id)
       // Prepare minimal user immediately
       const minimalUser = {
         id: authUser.id,
@@ -118,7 +106,6 @@ export const AuthProvider = ({ children }) => {
 
       // Immediately set minimal user so routes can proceed while profile loads
       setUser(minimalUser)
-      console.log('[Auth] Minimal user set before profile fetch', { id: minimalUser.id })
 
       // Try to fetch profile with a timeout to avoid hanging indefinitely on old devices
       let profile = null
@@ -135,17 +122,10 @@ export const AuthProvider = ({ children }) => {
         profile = result.data
         error = result.error
       } catch (e) {
-        if (e && e.message === 'TIMEOUT') {
-          console.warn('[Auth] Profile fetch timed out, proceeding with minimal user')
-        } else {
-          console.error('[Auth] Profile fetch threw error:', e)
-        }
+        // silently proceed with minimal user on timeout or fetch error
       }
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('[Auth] Error fetching profile:', error)
-        // Proceed with basic auth user data to avoid redirect loops when profile is not readable
-      }
+      // Proceed with basic auth user data to avoid redirect loops when profile is not readable
 
       const userData = {
         ...minimalUser,
@@ -157,9 +137,8 @@ export const AuthProvider = ({ children }) => {
       }
 
       setUser(userData)
-      console.log('[Auth] User set in context', { id: userData.id, isAdmin: userData.isAdmin, role: userData.role })
     } catch (error) {
-      console.error('[Auth] Error in fetchUserProfile:', error)
+      // swallow errors to avoid console noise in production
     }
   }
 
