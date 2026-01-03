@@ -18,6 +18,16 @@ export const ChatProvider = ({ children }) => {
   const [currentConversation, setCurrentConversation] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  const promiseWithTimeout = (promise, ms) => {
+    let timer
+    return Promise.race([
+      promise.finally(() => clearTimeout(timer)),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('TIMEOUT')), ms)
+      })
+    ])
+  }
+
   // Load conversations when user changes
   useEffect(() => {
     if (user) {
@@ -32,14 +42,17 @@ export const ChatProvider = ({ children }) => {
     if (!user) return
     
     try {
-      const { data: conversations, error } = await supabase
+      const { data: conversations, error } = await promiseWithTimeout(
+        supabase
         .from('conversations')
         .select(`
           *,
           messages (*)
         `)
         .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
+        .order('updated_at', { ascending: false }),
+        3000
+      )
 
       if (error) {
         console.error('Error loading conversations:', error)
@@ -73,7 +86,8 @@ export const ChatProvider = ({ children }) => {
     if (!user) throw new Error('User not authenticated')
 
     try {
-      const { data: conversation, error } = await supabase
+      const { data: conversation, error } = await promiseWithTimeout(
+        supabase
         .from('conversations')
         .insert({
           user_id: user.id,
@@ -82,7 +96,9 @@ export const ChatProvider = ({ children }) => {
           updated_at: new Date().toISOString()
         })
         .select()
-        .single()
+        .single(),
+        3000
+      )
 
       if (error) {
         throw error
@@ -109,7 +125,8 @@ export const ChatProvider = ({ children }) => {
 
   const saveMessageToSupabase = async (conversationId, content, sender, isError = false) => {
     try {
-      const { data: message, error } = await supabase
+      const { data: message, error } = await promiseWithTimeout(
+        supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
@@ -119,7 +136,9 @@ export const ChatProvider = ({ children }) => {
           created_at: new Date().toISOString()
         })
         .select()
-        .single()
+        .single(),
+        3000
+      )
 
       if (error) {
         throw error
@@ -140,13 +159,16 @@ export const ChatProvider = ({ children }) => {
 
   const updateConversationInSupabase = async (conversationId, updates) => {
     try {
-      const { error } = await supabase
+      const { error } = await promiseWithTimeout(
+        supabase
         .from('conversations')
         .update({
           ...updates,
           updated_at: new Date().toISOString()
         })
-        .eq('id', conversationId)
+        .eq('id', conversationId),
+        3000
+      )
 
       if (error) {
         throw error
@@ -209,6 +231,9 @@ export const ChatProvider = ({ children }) => {
       
       console.log('Sending message to n8n:', message)
       
+      // External request with timeout
+      const controller = new AbortController()
+      const fetchTimeout = setTimeout(() => controller.abort(), 20000)
       const response = await fetch('https://agents.customcx.com/webhook/HDRC', {
         method: 'POST',
         headers: {
@@ -224,8 +249,10 @@ export const ChatProvider = ({ children }) => {
             company: user.company,
             role: user.role
           }
-        })
+        }),
+        signal: controller.signal
       })
+      clearTimeout(fetchTimeout)
       
       console.log('Response status:', response.status)
       
@@ -339,10 +366,13 @@ export const ChatProvider = ({ children }) => {
   const deleteConversation = async (conversationId) => {
     try {
       // Delete from Supabase (messages will be deleted via cascade)
-      const { error } = await supabase
+      const { error } = await promiseWithTimeout(
+        supabase
         .from('conversations')
         .delete()
-        .eq('id', conversationId)
+        .eq('id', conversationId),
+        3000
+      )
 
       if (error) {
         throw error
@@ -371,10 +401,13 @@ export const ChatProvider = ({ children }) => {
 
     try {
       // Delete all conversations for the user from Supabase
-      const { error } = await supabase
+      const { error } = await promiseWithTimeout(
+        supabase
         .from('conversations')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', user.id),
+        3000
+      )
 
       if (error) {
         throw error
