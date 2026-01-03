@@ -15,10 +15,16 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const promiseWithTimeout = (promise, ms) => {
+  const promiseWithTimeout = (p, ms) => {
     let timer
     return Promise.race([
-      promise.finally(() => clearTimeout(timer)),
+      new Promise((resolve, reject) => {
+        const settle = () => clearTimeout(timer)
+        Promise.resolve(p).then(
+          (v) => { settle(); resolve(v) },
+          (e) => { settle(); reject(e) }
+        )
+      }),
       new Promise((_, reject) => {
         timer = setTimeout(() => reject(new Error('TIMEOUT')), ms)
       })

@@ -18,10 +18,16 @@ export const ChatProvider = ({ children }) => {
   const [currentConversation, setCurrentConversation] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const promiseWithTimeout = (promise, ms) => {
+  const promiseWithTimeout = (p, ms) => {
     let timer
     return Promise.race([
-      promise.finally(() => clearTimeout(timer)),
+      new Promise((resolve, reject) => {
+        const settle = () => clearTimeout(timer)
+        Promise.resolve(p).then(
+          (v) => { settle(); resolve(v) },
+          (e) => { settle(); reject(e) }
+        )
+      }),
       new Promise((_, reject) => {
         timer = setTimeout(() => reject(new Error('TIMEOUT')), ms)
       })
@@ -31,8 +37,10 @@ export const ChatProvider = ({ children }) => {
   // Load conversations when user changes
   useEffect(() => {
     if (user) {
+      console.log('[Chat] user set, loading conversations for', user.id)
       loadConversations()
     } else {
+      console.log('[Chat] no user, resetting conversations state')
       setConversations([])
       setCurrentConversation(null)
     }
@@ -42,6 +50,7 @@ export const ChatProvider = ({ children }) => {
     if (!user) return
     
     try {
+      console.log('[Chat] loadConversations:start')
       const { data: conversations, error } = await promiseWithTimeout(
         supabase
         .from('conversations')
@@ -76,8 +85,9 @@ export const ChatProvider = ({ children }) => {
       }))
 
       setConversations(transformedConversations)
+      console.log('[Chat] loadConversations:success count=', transformedConversations.length)
     } catch (error) {
-      console.error('Error loading conversations:', error)
+      console.error('[Chat] loadConversations:error', error)
       setConversations([])
     }
   }
@@ -86,6 +96,7 @@ export const ChatProvider = ({ children }) => {
     if (!user) throw new Error('User not authenticated')
 
     try {
+      console.log('[Chat] createNewConversation:start title=', title)
       const { data: conversation, error } = await promiseWithTimeout(
         supabase
         .from('conversations')
@@ -115,16 +126,18 @@ export const ChatProvider = ({ children }) => {
       const updatedConversations = [newConversation, ...conversations]
       setConversations(updatedConversations)
       setCurrentConversation(newConversation)
+      console.log('[Chat] createNewConversation:success id=', newConversation.id)
       
       return newConversation
     } catch (error) {
-      console.error('Error creating conversation:', error)
+      console.error('[Chat] createNewConversation:error', error)
       throw error
     }
   }
 
   const saveMessageToSupabase = async (conversationId, content, sender, isError = false) => {
     try {
+      console.log('[Chat] saveMessage:start', { conversationId, sender, isError })
       const { data: message, error } = await promiseWithTimeout(
         supabase
         .from('messages')
@@ -144,21 +157,24 @@ export const ChatProvider = ({ children }) => {
         throw error
       }
 
-      return {
+      const result = {
         id: message.id,
         content: message.content,
         sender: message.sender,
         timestamp: message.created_at,
         isError: message.is_error || false
       }
+      console.log('[Chat] saveMessage:success id=', result.id)
+      return result
     } catch (error) {
-      console.error('Error saving message:', error)
+      console.error('[Chat] saveMessage:error', error)
       throw error
     }
   }
 
   const updateConversationInSupabase = async (conversationId, updates) => {
     try {
+      console.log('[Chat] updateConversation:start', { conversationId })
       const { error } = await promiseWithTimeout(
         supabase
         .from('conversations')
@@ -173,8 +189,9 @@ export const ChatProvider = ({ children }) => {
       if (error) {
         throw error
       }
+      console.log('[Chat] updateConversation:success', { conversationId })
     } catch (error) {
-      console.error('Error updating conversation:', error)
+      console.error('[Chat] updateConversation:error', error)
       throw error
     }
   }
@@ -186,6 +203,7 @@ export const ChatProvider = ({ children }) => {
     
     // If no conversation exists, create one
     if (!targetConversation && !conversationId) {
+      console.log('[Chat] sendMessage:no active conversation, creating new one')
       targetConversation = await createNewConversation()
     } else if (conversationId) {
       targetConversation = conversations.find(c => c.id === conversationId)
@@ -194,6 +212,7 @@ export const ChatProvider = ({ children }) => {
     if (!targetConversation) throw new Error('No conversation found')
     
     try {
+      console.log('[Chat] sendMessage:start', { conversationId: targetConversation.id })
       // Save user message to Supabase
       const userMessage = await saveMessageToSupabase(
         targetConversation.id,
@@ -229,7 +248,7 @@ export const ChatProvider = ({ children }) => {
       // Send to n8n webhook and wait for response
       setLoading(true)
       
-      console.log('Sending message to n8n:', message)
+      console.log('[Chat] n8n:request ->', message)
       
       // External request with timeout
       const controller = new AbortController()
@@ -254,7 +273,7 @@ export const ChatProvider = ({ children }) => {
       })
       clearTimeout(fetchTimeout)
       
-      console.log('Response status:', response.status)
+      console.log('[Chat] n8n:response status', response.status)
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -264,14 +283,14 @@ export const ChatProvider = ({ children }) => {
       
       // Get response text first to handle different content types
       const responseText = await response.text()
-      console.log('Raw response:', responseText)
+      console.log('[Chat] n8n:response body', responseText)
       
       let responseData
       try {
         responseData = JSON.parse(responseText)
-        console.log('Parsed response data:', responseData)
+        // parsed ok
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', parseError)
+        console.error('[Chat] n8n:parse error, fallback to text', parseError)
         // If it's not JSON, treat the text as the message
         responseData = { message: responseText }
       }
@@ -306,6 +325,7 @@ export const ChatProvider = ({ children }) => {
           aiMessageContent,
           'ai'
         )
+        console.log('[Chat] AI message saved id=', aiMessage.id)
         
         const finalMessages = [...updatedMessages, aiMessage]
         const finalConversation = {
@@ -325,11 +345,11 @@ export const ChatProvider = ({ children }) => {
       }
       
       // If no message content found, show error
-      console.error('No message content found in response:', responseData)
+      console.error('[Chat] n8n:no message content', responseData)
       throw new Error('No message content received from AI agent')
       
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error('[Chat] sendMessage:error', error)
       
       try {
         // Add error message to Supabase
@@ -354,12 +374,13 @@ export const ChatProvider = ({ children }) => {
         setConversations(errorConversations)
         setCurrentConversation(errorConversation)
       } catch (saveError) {
-        console.error('Error saving error message:', saveError)
+        console.error('[Chat] save error message failed:', saveError)
       }
       
       throw error
     } finally {
       setLoading(false)
+      console.log('[Chat] sendMessage:end')
     }
   }
 
