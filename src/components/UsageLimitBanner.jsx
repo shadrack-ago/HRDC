@@ -41,12 +41,27 @@ const UsageLimitBanner = ({ onUsageUpdate }) => {
     }
   }
 
-  if (loading || !usageData || !subscription) {
+  if (loading) {
     return null
   }
 
-  // Don't show banner for standard plan users
+  // If we don't have data, don't show banner
+  if (!usageData || !subscription) {
+    return null
+  }
+
+  // CRITICAL: Don't show banner for standard/premium plan users
   if (subscription.plan_type === 'standard' && subscription.is_active) {
+    return null
+  }
+
+  // Don't show if user can query and hasn't hit limit (for any non-free plan)
+  if (usageData.can_query && !usageData.limit_reached && subscription.plan_type !== 'free') {
+    return null
+  }
+
+  // Only show for free plan users
+  if (subscription.plan_type !== 'free') {
     return null
   }
 
