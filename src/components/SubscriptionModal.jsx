@@ -3,8 +3,8 @@ import { X, Check, CreditCard, Zap, Shield, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { SUBSCRIPTION_PLANS, initializePayment, updateSubscription } from '../lib/paystack'
 
-const SubscriptionModal = ({ isOpen, onClose, onSubscriptionUpdate }) => {
-  const { user } = useAuth()
+const SubscriptionModal = ({ isOpen, onClose }) => {
+  const { user, refreshSubscription } = useAuth()
   const [loading, setLoading] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState('standard')
 
@@ -44,11 +44,9 @@ const SubscriptionModal = ({ isOpen, onClose, onSubscriptionUpdate }) => {
       callback: function(response) {
         // Handle async operations inside but don't make function async
         updateSubscription(user.id, response)
-          .then(() => {
-            // Notify parent component
-            if (onSubscriptionUpdate) {
-              onSubscriptionUpdate()
-            }
+          .then(async () => {
+            // Refresh subscription status automatically
+            await refreshSubscription()
             
             alert('Payment successful! Your subscription has been activated.')
             onClose()

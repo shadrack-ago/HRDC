@@ -210,3 +210,59 @@ export const incrementUsageCount = async (userId) => {
     return false
   }
 }
+
+// Admin function to elevate user subscription without payment
+export const elevateUserSubscription = async (userId, planType = 'standard', durationMonths = 1) => {
+  try {
+    const expiresAt = new Date()
+    expiresAt.setMonth(expiresAt.getMonth() + durationMonths)
+
+    // Update or create subscription
+    const { data: subscription, error: subError } = await supabase
+      .from('subscriptions')
+      .upsert({
+        user_id: userId,
+        plan_type: planType,
+        status: 'active',
+        paystack_subscription_id: `admin_${userId}_${Date.now()}`,
+        paystack_customer_id: null,
+        amount_paid: 0,
+        currency: 'KES',
+        expires_at: expiresAt.toISOString(),
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      })
+      .select()
+      .single()
+
+    if (subError) {
+      throw new Error('Failed to elevate user subscription')
+    }
+
+    // Log the admin action
+    const { error: logError } = await supabase
+      .from('admin_actions')
+      .insert({
+        admin_id: null, // Will be set by caller
+        user_id: userId,
+        action: 'subscription_elevated',
+        details: {
+          plan_type: planType,
+          duration_months: durationMonths,
+          expires_at: expiresAt.toISOString()
+        },
+        created_at: new Date().toISOString()
+      })
+
+    if (logError) {
+      console.error('Failed to log admin action:', logError)
+    }
+
+    return subscription
+  } catch (error) {
+    console.error('Error elevating user subscription:', error)
+    throw error
+  }
+}

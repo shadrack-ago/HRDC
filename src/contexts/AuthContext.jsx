@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { getUserSubscription } from '../lib/paystack'
 
 const AuthContext = createContext()
 
@@ -13,6 +14,7 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
+  const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const promiseWithTimeout = (p, ms) => {
@@ -94,6 +96,18 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe()
   }, [])
 
+  const refreshSubscription = async () => {
+    if (!user) return
+    
+    try {
+      const subscriptionData = await getUserSubscription(user.id)
+      setSubscription(subscriptionData)
+    } catch (error) {
+      console.error('Error refreshing subscription:', error)
+      setSubscription({ plan_type: 'free', status: 'active', is_active: true })
+    }
+  }
+
   const fetchUserProfile = async (authUser) => {
     try {
       // Prepare minimal user immediately
@@ -143,6 +157,9 @@ export const AuthProvider = ({ children }) => {
       }
 
       setUser(userData)
+      
+      // Load subscription data
+      await refreshSubscription()
     } catch (error) {
       // swallow errors to avoid console noise in production
     }
@@ -299,12 +316,14 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    subscription,
     loading,
     login,
     register,
     logout,
     updateProfile,
-    deleteAccount
+    deleteAccount,
+    refreshSubscription
   }
 
   return (

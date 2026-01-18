@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Users, MessageSquare, Calendar, TrendingUp } from 'lucide-react'
+import { elevateUserSubscription } from '../lib/paystack'
+import { Users, MessageSquare, Calendar, TrendingUp, Crown, UserCheck, AlertCircle } from 'lucide-react'
 
 const Admin = () => {
   const { user } = useAuth()
@@ -13,6 +14,7 @@ const Admin = () => {
   })
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [elevatingUser, setElevatingUser] = useState(null)
 
   useEffect(() => {
     if (user?.isAdmin) {
@@ -48,9 +50,9 @@ const Admin = () => {
         })
       }
 
-      // Get recent users directly (simplified for now)
+      // Get recent users with subscription info using the admin view
       const { data: recentUsers, error: usersError } = await supabase
-        .from('profiles')
+        .from('admin_users_with_subscriptions')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10)
@@ -74,6 +76,44 @@ const Admin = () => {
       setUsers([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleElevateUser = async (userId, userName) => {
+    if (!confirm(`Are you sure you want to elevate ${userName} to Standard subscription?`)) {
+      return
+    }
+
+    try {
+      setElevatingUser(userId)
+      
+      // Log admin action first
+      await supabase
+        .from('admin_actions')
+        .insert({
+          admin_id: user.id,
+          user_id: userId,
+          action: 'subscription_elevated',
+          details: {
+            plan_type: 'standard',
+            duration_months: 1,
+            elevated_by: user.email
+          },
+          created_at: new Date().toISOString()
+        })
+
+      // Elevate user subscription
+      await elevateUserSubscription(userId, 'standard', 1)
+      
+      // Reload data to reflect changes
+      await loadAdminData()
+      
+      alert(`Successfully elevated ${userName} to Standard subscription!`)
+    } catch (error) {
+      console.error('Error elevating user:', error)
+      alert('Failed to elevate user. Please try again.')
+    } finally {
+      setElevatingUser(null)
     }
   }
 
@@ -183,7 +223,13 @@ const Admin = () => {
                     Joined
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Subscription
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Admin
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -210,6 +256,22 @@ const Admin = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          userData.current_plan === 'standard' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {userData.current_plan}
+                        </span>
+                        {userData.expires_at && (
+                          <span className="text-xs text-gray-500">
+                            Expires: {new Date(userData.expires_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         userData.is_admin 
                           ? 'bg-green-100 text-green-800' 
@@ -217,6 +279,30 @@ const Admin = () => {
                       }`}>
                         {userData.is_admin ? 'Yes' : 'No'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <div className="flex items-center space-x-2">
+                        {userData.current_plan !== 'standard' && (
+                          <button
+                            onClick={() => handleElevateUser(userData.id, `${userData.first_name} ${userData.last_name}`)}
+                            disabled={elevatingUser === userData.id}
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {elevatingUser === userData.id ? (
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                            ) : (
+                              <Crown className="h-3 w-3 mr-1" />
+                            )}
+                            Elevate
+                          </button>
+                        )}
+                        {userData.current_plan === 'standard' && (
+                          <span className="inline-flex items-center text-xs text-green-600">
+                            <UserCheck className="h-3 w-3 mr-1" />
+                            Premium
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -231,6 +231,35 @@ const Dashboard = () => {
           </Link>
         </div>
       </div>
+
+      {/* Terms and Conditions Notice */}
+      <div className="mt-8 bg-amber-50 border border-amber-200 rounded-lg p-6">
+        <div className="flex items-start space-x-3">
+          <div className="bg-amber-100 p-2 rounded-lg">
+            <FileText className="h-5 w-5 text-amber-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-amber-900 mb-2">
+              Important: Terms and Conditions
+            </h3>
+            <p className="text-amber-800 text-sm mb-3">
+              Please review our updated Terms and Conditions to understand your rights and responsibilities when using HR Digital Consulting services.
+            </p>
+            <div className="flex items-center space-x-4">
+              <Link
+                to="/terms-and-conditions"
+                className="text-amber-700 hover:text-amber-900 font-medium text-sm underline"
+              >
+                Read Full Terms & Conditions
+              </Link>
+              <span className="text-amber-600 text-sm">•</span>
+              <span className="text-amber-600 text-sm">
+                Last updated: January 18, 2026
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
